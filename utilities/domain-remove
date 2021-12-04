@@ -1,0 +1,70 @@
+#!/bin/bash
+# Run as root
+domain=$1
+
+if [ "$1" == "--help" ]; then
+	echo "Usage: domain-remove <domain name>"
+	exit
+fi
+
+if [ -z "$domain" ]; then
+	echo "Usage: domain-remove <domain name>"
+	echo "Domain name required."
+	exit
+fi
+
+# ----------------------------------------- Bind9
+if [ -f "/etc/bind/db.$domain" ]; then
+	echo "Removing /etc/bind/db.$domain"
+	sudo rm /etc/bind/db.$domain
+fi
+
+if [ -f /etc/bind/named.conf.local ]; then
+	pointer=`grep "$domain" /etc/bind/named.conf.local`
+	if [ -n "$pointer" ]; then
+		echo "Removing pointer in /etc/bind/named.conf.local"
+		sudo sed -i -E "s/^zone \"$domain\".*//" /etc/bind/named.conf.local
+	fi
+fi
+
+local_host=`grep -E "^127.0.0.1\s+$domain" /etc/hosts`
+if [ -n "$local_host" ]; then
+	echo "Removing pointer from /etc/hosts"
+	sudo sed -i -E "s/^127.0.0.1\s+$domain//" /etc/hosts
+fi
+echo "Restarting Bind9 named"
+sudo service named restart
+
+# ----------------------------------------- Apache
+if [ -d "/var/www/$domain" ]; then
+	echo "Removing Apache DOCUMENT_ROOT /var/www/$domain"
+	sudo rm -rf /var/www/$domain
+fi
+
+if [ -f "/etc/apache/sites-available/$domain.conf" ]; then
+	echo "Removing /etc/apache/sites-available/$domain.conf"
+	sudo rm /etc/apache/sites-available/$domain.conf
+fi
+
+if [ -f "/etc/apache/sites-enabled/$domain.conf" ]; then
+	echo "Unlinking /etc/apache/sites-enabled/$domain.conf"
+	sudo rm /etc/apache/sites-enabled/$domain.conf
+fi
+echo "Restarting Apache"
+sudo systemctl restart apache2
+
+# ----------------------------------------- MySQL
+mysql_command=`which mysql`
+if [ -n "$mysql_command" ]; then
+	stem=`echo $domain | sed -E 's/\..*//g'`
+	databases=`sudo mysql -e "show databases" | grep $stem`
+	if [ -n "$databases" ]; then
+		echo "Dropping database $stem"
+		sudo mysql -e "drop database $stem"
+	fi
+	users=`sudo mysql -e "select user from mysql.user" | grep $stem`
+	if [ -n "$users" ]; then
+		echo "Dropping user $stem"
+		sudo mysql -e "drop user '$stem'@'localhost'"
+	fi
+fi

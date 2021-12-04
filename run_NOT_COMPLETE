@@ -1,0 +1,11 @@
+#!/bin/bash
+# Java
+NOT_COMPLETE: for running gradle TomCat servers and things
+java_version=`grep -E java=[0-9]+ $filepath/install.options | sed 's/java=//'`
+if [ -n "$java_version" ]; then
+    echo "Setting java version and JAVA_HOME to $java_version"
+    export JAVA_HOME=/usr/lib/jvm/java-$java_version-openjdk-amd64/
+    update-alternatives --list java
+    sudo update-alternatives --config java  # Need to use java JDK 8 (1.8)
+fi
+ 

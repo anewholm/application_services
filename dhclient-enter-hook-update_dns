@@ -1,0 +1,15 @@
+#!/bin/sh
+case "$reason" in
+    MEDIUM|ARPCHECK|ARPSEND|NBI)
+        ;;
+
+    PREINIT|BOUND|RENEW|REBIND|REBOOT|STOP|RELEASE)
+        if [ -n "$ip_address" ]; then
+            /etc/init.d/update_dns.sh $ip_address
+        fi
+        ;;
+    
+    EXPIRE|FAIL|TIMEOUT)
+        # Starting avahi-autoipd is left for the exit hook
+        ;;
+esac
